@@ -1,0 +1,21 @@
+analytics:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: 'not needed'
+      user: 'not needed'
+      role: transformer
+      database: SB_SNOWFLAKE_DBT_TESTING
+      schema: dev
+      warehouse: TRANSFORMING
+      threads: 16
+    prod:
+      type: snowflake
+      account: 'not needed'
+      user: 'not needed'
+      role: transformer
+      database: SB_SNOWFLAKE_DBT_TESTING
+      schema: prod
+      warehouse: TRANSFORMING
+      threads: 16
