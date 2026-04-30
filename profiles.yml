@@ -9,7 +9,7 @@ analytics:
       database: SB_SNOWFLAKE_DBT_TESTING
       schema: dev
       warehouse: TRANSFORMING
-      threads: 16
+      threads: 4
     prod:
       type: snowflake
       account: 'not needed'
@@ -18,4 +18,4 @@ analytics:
       database: SB_SNOWFLAKE_DBT_TESTING
       schema: prod
       warehouse: TRANSFORMING
-      threads: 16
+      threads: 4
