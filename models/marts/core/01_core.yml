@@ -1,0 +1,195 @@
+groups:
+  - name: data_team
+    owner:
+      name: Data Team
+      email: data@acme.co
+
+models:
+  - name: dim_customers
+    config:
+      contract:
+        enforced: true
+      group: data_team
+      access: public
+    description: One row per customer enriched with geography, account attributes, and customer value signals. Version 1 exposes the legacy `tier_name`, while version 2 replaces that field with explicit high/mid/low value flags from `customer_flags`.
+    columns:
+      - name: customer_key
+        data_type: int
+        description: Primary key on the customers table.
+        data_tests:
+          - unique
+          - not_null
+      - name: region
+        data_type: varchar(25)
+        description: Region associated with the customer's nation.
+        data_tests:
+          - accepted_values:
+              config:
+                severity: warn
+              arguments:
+                values: ['AFRICA', 'MIDDLE EAST', 'ASIA', 'EUROPE', 'AMERICA']
+      - name: name
+        data_type: varchar(25)
+        description: Customer name from the source system.
+      - name: address
+        data_type: varchar(40)
+        description: Mailing address for the customer.
+      - name: nation
+        data_type: varchar(25)
+        description: Nation associated with the customer.
+      - name: phone_number
+        data_type: varchar(15)
+        description: Phone number for the customer.
+      - name: account_balance
+        data_type: number(38,0)
+        description: '{{ doc("account_balance") }}'
+      - name: market_segment
+        data_type: varchar(10)
+        description: Market segment assigned to the customer.
+      - name: lifetime_value
+        data_type: int
+        description: Sum of historical order revenue for the customer.
+      - name: tier_name
+        data_type: string
+        description: Legacy customer value tier retained in version 1 only.
+      - name: is_high_value
+        data_type: varchar(1)
+        description: '`Y` when the customer is classified as high value.'
+
+      - name: is_mid_value
+        data_type: varchar(1)
+        description: '`Y` when the customer is classified as mid value.'
+
+      - name: is_low_value
+        data_type: varchar(1)
+        description: '`Y` when the customer is classified as low value.'
+
+    versions:
+      - v: 1
+        columns:
+          - include: all
+            exclude: [is_high_value,is_mid_value,is_low_value]
+        deprecation_date: 2024-08-31 00:00:00+00:00
+      - v: 2
+        columns:
+          - include: all
+            exclude: [tier_name]
+    latest_version: 2
+
+  - name: dim_suppliers
+    description: One row per supplier enriched with nation and region so supplier analysis can happen without repeatedly joining geography lookups.
+    columns:
+      - name: supplier_key
+        description: Primary key of the model.
+        data_tests:
+          - unique
+          - not_null
+      - name: supplier_name
+        description: '{{ doc("supplier_name") }}'
+      - name: supplier_address
+        description: '{{ doc("supplier_address") }}'
+      - name: nation
+        description: Nation associated with the supplier.
+      - name: region
+        description: Region associated with the supplier's nation.
+      - name: phone_number
+        description: '{{ doc("phone_number") }}'
+      - name: account_balance
+        description: '{{ doc("account_balance") }}'
+
+  - name: fct_order_items
+    description: One row per order item with pricing, discount, tax, supplier cost, and shipment attributes. This is the core item-grain fact table used for order, return, and margin-style analysis.
+    columns:
+      - name: order_item_key
+        description: '{{ doc("order_item_key") }}'
+        data_tests:
+          - unique
+          - not_null
+      - name: order_key
+        description: Foreign key to the parent order.
+      - name: order_date
+        description: Date the parent order was placed.
+      - name: customer_key
+        description: Foreign key to the customer who placed the order.
+      - name: part_key
+        description: Foreign key to the ordered part.
+      - name: supplier_key
+        description: Foreign key to the supplier fulfilling the line item.
+      - name: order_item_status_code
+        description: Status code for the order item shipment lifecycle.
+      - name: return_flag
+        description: '{{ doc("return_flag") }}'
+      - name: line_number
+        description: '{{ doc("line_number") }}'
+      - name: ship_date
+        description: '{{ doc("ship_date") }}'
+      - name: commit_date
+        description: '{{ doc("commit_date") }}'
+      - name: receipt_date
+        description: '{{ doc("receipt_date") }}'
+      - name: ship_mode
+        description: '{{ doc("ship_mode") }}'
+      - name: supplier_cost
+        description: Supplier-side cost for the part and supplier combination.
+      - name: base_price
+        description: '{{ doc("base_price") }}'
+      - name: discount_percentage
+        description: '{{ doc("discount_percentage") }}'
+      - name: discounted_price
+        description: '{{ doc("discounted_price") }}'
+      - name: tax_rate
+        description: '{{ doc("tax_rate") }}'
+      - name: nation_key
+        description: Nation key associated with the supplier.
+        data_tests:
+          - not_null
+      - name: order_item_count
+        description: Constant 1 used for additive item counting.
+      - name: quantity
+        description: Number of units included in the line item.
+      - name: gross_item_sales_amount
+        description: '{{ doc("gross_item_sales_amount") }}'
+      - name: discounted_item_sales_amount
+        description: '{{ doc("discounted_item_sales_amount") }}'
+      - name: item_discount_amount
+        description: '{{ doc("item_discount_amount") }}'
+      - name: item_tax_amount
+        description: '{{ doc("item_tax_amount") }}'
+      - name: net_item_sales_amount
+        description: '{{ doc("net_item_sales_amount") }}'
+    config:
+      group: data_team
+      access: public
+
+  - name: fct_orders
+    description: One row per order with rolled-up item revenue, discounts, tax, and return counts. This is the order-grain fact table used for top-line order performance analysis.
+    columns:
+      - name: order_key
+        description: Primary key of the model.
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_key
+        description: Foreign key to the customer who placed the order.
+      - name: order_date
+        description: Date the order was placed.
+      - name: status_code
+        description: Status code of the order.
+      - name: priority_code
+        description: Priority code associated with the order.
+      - name: clerk_name
+        description: Clerk identifier associated with the order.
+      - name: ship_priority
+        description: Numeric representation of shipping priority, where zero is the default.
+      - name: order_count
+        description: Constant 1 used for additive order counting.
+      - name: return_count
+        description: Count of returned line items associated with the order.
+      - name: gross_item_sales_amount
+        description: '{{ doc("gross_item_sales_amount") }}'
+      - name: item_discount_amount
+        description: '{{ doc("item_discount_amount") }}'
+      - name: item_tax_amount
+        description: '{{ doc("item_tax_amount") }}'
+      - name: net_item_sales_amount
+        description: '{{ doc("net_item_sales_amount") }}'
