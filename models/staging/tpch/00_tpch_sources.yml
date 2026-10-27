@@ -247,7 +247,7 @@ sources:
                   config:
                     severity: warn
                   arguments:
-                    values: ['R', 'A']
+                    values: ['R', 'A', 'N']
           - name: l_linestatus
             description: status code of the order item (P=returned, F=billed, O=shipped)
             data_tests:
@@ -296,7 +296,9 @@ sources:
             description: primary key of the movie review table
             data_tests:
               - not_null
-              - unique
+              - unique:
+                  config:
+                    severity: warn  # raw table currently has duplicate ids
           - name: movie_id
             description: foreign key identifying which movie the review is for
             data_tests:

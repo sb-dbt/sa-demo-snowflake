@@ -55,7 +55,7 @@ models:
               config:
                 severity: warn
               arguments:
-                values: ['returned', 'accepted']
+                values: ['returned', 'accepted', 'not_returned']
       - name: is_return
         description: '{{ doc("is_return") }}'
       - name: status_code

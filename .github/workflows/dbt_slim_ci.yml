@@ -1,0 +1,73 @@
+name: dbt Slim CI (dbt Projects on Snowflake)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+env:
+  SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+  SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+  SNOWFLAKE_PRIVATE_KEY_RAW: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+  SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
+  SNOWFLAKE_ROLE: TRANSFORMER
+  SNOWFLAKE_WAREHOUSE: TRANSFORMING
+  DBT_DATABASE: SB_SNOWFLAKE_DBT_TESTING
+  PROD_OBJECT: SB_SNOWFLAKE_DBT_TESTING.PROD.SA_DEMO_SNOWFLAKE
+  CI_OBJECT: SB_SNOWFLAKE_DBT_TESTING.CI.SA_DEMO_SNOWFLAKE_CI
+  EAI: GG_DBT_DEPS_EAI
+
+jobs:
+  slim-ci:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # One shared CI object: serialize PR runs so deploys don't overwrite each other mid-build
+    concurrency:
+      group: dbt-ci-object
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Snowflake CLI
+        run: pip install "snowflake-cli>=3.28.0"
+
+      - name: Deploy PR code to CI object
+        run: |
+          snow dbt deploy SA_DEMO_SNOWFLAKE_CI -x \
+            --source . \
+            --database "$DBT_DATABASE" --schema CI \
+            --default-target ci \
+            --external-access-integration "$EAI" \
+            --no-auto-compile
+
+      - name: Build modified models, defer unchanged to prod
+        run: |
+          snow dbt execute -x \
+            --import "SYSTEM\$DBT_GET_LAST_SUCCESSFUL_RUN_TARGET('$PROD_OBJECT') AS 'state'" \
+            "$CI_OBJECT" \
+            build --target ci --state ./imports/state --defer --select state:modified+
+
+  deploy-prod:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: dbt-prod-object
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Snowflake CLI
+        run: pip install "snowflake-cli>=3.28.0"
+
+      # No --force: keeps run history that Slim CI reads state from
+      - name: Redeploy prod object
+        run: |
+          snow dbt deploy SA_DEMO_SNOWFLAKE -x \
+            --source . \
+            --database "$DBT_DATABASE" --schema PROD \
+            --default-target prod \
+            --external-access-integration "$EAI"
+
+      - name: Build prod (becomes the next Slim CI state)
+        run: snow dbt execute -x "$PROD_OBJECT" build --target prod
