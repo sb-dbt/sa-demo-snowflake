@@ -10,6 +10,15 @@ analytics:
       schema: dev
       warehouse: TRANSFORMING
       threads: 4
+    ci:
+      type: snowflake
+      account: 'not needed'
+      user: 'not needed'
+      role: transformer
+      database: SB_SNOWFLAKE_DBT_TESTING
+      schema: ci
+      warehouse: TRANSFORMING
+      threads: 4
     prod:
       type: snowflake
       account: 'not needed'

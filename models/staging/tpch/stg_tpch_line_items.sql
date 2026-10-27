@@ -24,13 +24,11 @@ renamed as (
         case 
             when l_returnflag in ('R') then 'returned'
             when l_returnflag in ('A') then 'accepted'
+            when l_returnflag in ('N') then 'not_returned'
             else 'unknown'
         end as return_flag, 
 
-        case 
-            when return_flag = 'accepted' then false
-            else true
-        end as is_return,
+        l_returnflag = 'R' as is_return,
 
         case l_linestatus 
             when 'P' then 'returned'

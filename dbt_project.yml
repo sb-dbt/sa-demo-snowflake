@@ -23,6 +23,10 @@ clean-targets:         # directories to be removed by `dbt clean`
   - "target"
   - "dbt_packages"
 
+# Slim CI: diff every rebuilt model against prod (no-op unless target is `ci`)
+on-run-end:
+  - "{{ ci_compare_to_prod() }}"
+
 
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
