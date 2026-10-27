@@ -32,6 +32,13 @@ jobs:
       - name: Install Snowflake CLI
         run: pip install "snowflake-cli>=3.28.0"
 
+      # Install packages on the runner and ship dbt_packages/ with the deploy, so the
+      # build doesn't fetch from hub.getdbt.com through Snowflake's egress on every run
+      - name: Install dbt packages
+        run: |
+          pip install "dbt==2.0.9"
+          dbt deps
+
       - name: Deploy PR code to CI object
         run: |
           snow dbt deploy SA_DEMO_SNOWFLAKE_CI -x \
@@ -59,6 +66,11 @@ jobs:
 
       - name: Install Snowflake CLI
         run: pip install "snowflake-cli>=3.28.0"
+
+      - name: Install dbt packages
+        run: |
+          pip install "dbt==2.0.9"
+          dbt deps
 
       # No --force: keeps run history that Slim CI reads state from
       - name: Redeploy prod object
