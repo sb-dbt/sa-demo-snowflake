@@ -81,5 +81,19 @@ jobs:
             --default-target prod \
             --external-access-integration "$EAI"
 
-      - name: Build prod (becomes the next Slim CI state)
-        run: snow dbt execute -x "$PROD_OBJECT" build --target prod
+      # Slim: rebuild only what changed since prod's last successful run.
+      # Falls back to a full build when no state exists (none in the last 14 days).
+      - name: Build changed models in prod (becomes the next Slim CI state)
+        run: |
+          HAS_STATE=$(snow sql -x --format CSV -q \
+            "select SYSTEM\$DBT_GET_LAST_SUCCESSFUL_RUN_TARGET('$PROD_OBJECT') is not null as has_state" \
+            | tail -n 1)
+          if [ "$HAS_STATE" = "True" ]; then
+            snow dbt execute -x \
+              --import "SYSTEM\$DBT_GET_LAST_SUCCESSFUL_RUN_TARGET('$PROD_OBJECT') AS 'state'" \
+              "$PROD_OBJECT" \
+              build --target prod --state ./imports/state --select state:modified+
+          else
+            echo "No prod state in the last 14 days: running full build"
+            snow dbt execute -x "$PROD_OBJECT" build --target prod
+          fi
