@@ -31,7 +31,7 @@ final as (
         order_item.commit_date,
         order_item.receipt_date,
         order_item.ship_mode,
-        part_supplier.cost + 1000 as supplier_cost,
+        part_supplier.cost as supplier_cost,
         {# ps.retail_price, #}
         order_item.base_price,
         order_item.discount_percentage,
