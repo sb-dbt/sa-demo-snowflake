@@ -1,6 +1,7 @@
 analytics:
   target: dev
   outputs:
+    # Personal development (TRANSFORMER). Can read prod, can't write it.
     dev:
       type: snowflake
       account: 'not needed'
@@ -10,21 +11,23 @@ analytics:
       schema: dev
       warehouse: TRANSFORMING
       threads: 4
+    # Slim CI. DBT_DATABASE is overridden per pull request (see env.yml and the CI workflow)
     ci:
       type: snowflake
       account: 'not needed'
       user: 'not needed'
-      role: transformer
-      database: SB_SNOWFLAKE_DBT_TESTING
-      schema: ci
+      role: SA_DEMO_CI_ROLE
+      database: "{{ env_var('DBT_DATABASE', 'SB_SNOWFLAKE_DBT_TESTING') }}"
+      schema: sa_demo_prod
       warehouse: TRANSFORMING
       threads: 4
+    # Production. Only SA_DEMO_CI_ROLE (the CI/CD service user) can write here.
     prod:
       type: snowflake
       account: 'not needed'
       user: 'not needed'
-      role: transformer
-      database: SB_SNOWFLAKE_DBT_TESTING
-      schema: prod
+      role: SA_DEMO_CI_ROLE
+      database: "{{ env_var('DBT_DATABASE', 'SB_SNOWFLAKE_DBT_TESTING') }}"
+      schema: sa_demo_prod
       warehouse: TRANSFORMING
       threads: 4

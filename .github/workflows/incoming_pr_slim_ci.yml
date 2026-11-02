@@ -1,0 +1,69 @@
+name: Incoming PR - Slim CI
+run-name: Slim CI for PR #${{ github.event.number }} from ${{ github.actor }}
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: slim-ci-pr-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  run-snowflake-test-dbt-job:
+    name: "Run on Incoming PR - Slim CI"
+    runs-on: ubuntu-latest
+    environment: prod # Must match the OIDC subject's environment
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_DATABASE: ${{ vars.SNOWFLAKE_DATABASE }}
+      SNOWFLAKE_SCHEMA: ${{ vars.SNOWFLAKE_SCHEMA }}
+      PR_DATABASE: SA_DEMO_PR_${{ github.event.number }}
+      TESTER_OBJECT: TESTER_SA_DEMO_SNOWFLAKE_PR_${{ github.event.number }}
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Install Snowflake CLI
+        uses: snowflakedb/snowflake-actions@v3
+        with: # Ensures Snowflake CLI will search for OIDC users matching this subject
+          use-oidc: true
+
+      - name: Check Snowflake CLI Version
+        run: snow --version
+
+      # The -x is shorthand for --temporary-connection
+      - run: snow connection test -x
+
+      # Per-PR database holding a zero-copy clone of prod. Only the prod schema is cloned
+      # because SB_SNOWFLAKE_DBT_TESTING is shared with other projects.
+      - name: Create a staging database using the PR number
+        run: |
+          snow sql -x -q "CREATE OR REPLACE DATABASE $PR_DATABASE"
+          snow sql -x -q "CREATE SCHEMA $PR_DATABASE.$SNOWFLAKE_SCHEMA CLONE $SNOWFLAKE_DATABASE.$SNOWFLAKE_SCHEMA"
+
+      - name: Create a new tester dbt project object in ${{ vars.SNOWFLAKE_DATABASE }}.${{ vars.SNOWFLAKE_SCHEMA }}
+        run: |
+          snow dbt deploy "$TESTER_OBJECT" \
+            --source . \
+            --external-access-integration GG_DBT_DEPS_EAI \
+            --dbt-version 2.0.0 \
+            -x
+
+      - name: List all of the snowflake dbt project objects in your account
+        run: snow dbt list --format JSON -x
+
+      # Builds changed models and runs their tests in DAG order, failing early if any upstream test breaks
+      - name: Build and test dbt project in ${{ env.PR_DATABASE }}
+        run: |
+          snow dbt execute -x \
+            --import "SYSTEM\$DBT_GET_LAST_SUCCESSFUL_RUN_TARGET('$SNOWFLAKE_DATABASE.$SNOWFLAKE_SCHEMA.SA_DEMO_SNOWFLAKE') as state" \
+            --env staging \
+            --env-vars "{\"DBT_DATABASE\": \"$PR_DATABASE\"}" \
+            "$TESTER_OBJECT" \
+            build --target ci --state ./imports/state --defer --select state:modified+

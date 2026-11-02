@@ -1,0 +1,89 @@
+name: PR Accepted Deployment - Slim CI
+run-name: PR from ${{ github.actor }} accepted - triggered a ${{ github.event_name }}
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  run-snowflake-dbt-job:
+    if: github.event.pull_request.merged == true
+    name: "Run on Accepted PR - Slim CI"
+    runs-on: ubuntu-latest
+    environment: prod # Must match the OIDC subject's environment
+    concurrency:
+      group: sa-demo-prod-deploy
+      cancel-in-progress: false
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_DATABASE: ${{ vars.SNOWFLAKE_DATABASE }}
+      SNOWFLAKE_SCHEMA: ${{ vars.SNOWFLAKE_SCHEMA }}
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Install Snowflake CLI
+        uses: snowflakedb/snowflake-actions@v3
+        with: # Ensures Snowflake CLI will search for OIDC users matching this subject
+          use-oidc: true
+
+      - name: Check Snowflake CLI Version
+        run: snow --version
+
+      # The -x is shorthand for --temporary-connection
+      - run: snow connection test -x
+
+      # No --force: keeps the run history that Slim CI imports state from
+      - name: Deploy the prod dbt project object in ${{ vars.SNOWFLAKE_DATABASE }}.${{ vars.SNOWFLAKE_SCHEMA }}
+        run: |
+          snow dbt deploy SA_DEMO_SNOWFLAKE \
+            --source . \
+            --default-target prod \
+            --default-env prod \
+            --external-access-integration GG_DBT_DEPS_EAI \
+            --dbt-version 2.0.0 \
+            -x
+
+      - name: List all of the snowflake dbt project objects in your account
+        run: snow dbt list --format JSON -x
+
+      # Creates or updates the 12-hour prod build task (keeps prod fresh and Slim CI state < 14 days old)
+      - name: Run schedules.sql to create or alter tasks for SA_DEMO_SNOWFLAKE
+        run: snow sql -f ${{ github.workspace }}/schedules.sql -x
+
+  clean-up-pull-request:
+    name: Clean up pull-request resources - Slim CI
+    runs-on: ubuntu-latest
+    environment: prod # Must match the OIDC subject's environment
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_DATABASE: ${{ vars.SNOWFLAKE_DATABASE }}
+      SNOWFLAKE_SCHEMA: ${{ vars.SNOWFLAKE_SCHEMA }}
+
+    steps:
+      - name: Install Snowflake CLI
+        uses: snowflakedb/snowflake-actions@v3
+        with: # Ensures Snowflake CLI will search for OIDC users matching this subject
+          use-oidc: true
+
+      - name: Check Snowflake CLI Version
+        run: snow --version
+
+      # The -x is shorthand for --temporary-connection
+      - run: snow connection test -x
+
+      - name: Drop the tester dbt project object
+        run: snow sql -x -q "DROP DBT PROJECT IF EXISTS TESTER_SA_DEMO_SNOWFLAKE_PR_${{ github.event.pull_request.number }}"
+
+      - name: Drop the per-PR database
+        if: always()
+        run: snow sql -x -q "DROP DATABASE IF EXISTS SA_DEMO_PR_${{ github.event.pull_request.number }}"
+
+      - name: List all of the snowflake dbt project objects in your account
+        if: always()
+        run: snow dbt list -x
