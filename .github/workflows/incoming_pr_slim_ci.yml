@@ -51,6 +51,7 @@ jobs:
         run: |
           snow dbt deploy "$TESTER_OBJECT" \
             --source . \
+            --profiles-dir deploy \
             --external-access-integration GG_DBT_DEPS_EAI \
             --dbt-version 2.0.0 \
             -x

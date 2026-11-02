@@ -43,6 +43,7 @@ jobs:
         run: |
           snow dbt deploy SA_DEMO_SNOWFLAKE \
             --source . \
+            --profiles-dir deploy \
             --default-target prod \
             --default-env prod \
             --external-access-integration GG_DBT_DEPS_EAI \

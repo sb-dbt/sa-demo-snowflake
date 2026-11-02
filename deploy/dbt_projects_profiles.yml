@@ -1,0 +1,25 @@
+# Profile for the CI/CD-deployed dbt project objects (tester + prod).
+# Passed with `snow dbt deploy --profiles-dir deploy`; Snowflake stages it as
+# dbt_projects_profiles.yml, which takes precedence over the root profiles.yml.
+# It omits the `dev` target so the CI/CD service user never needs the developer role.
+analytics:
+  target: prod
+  outputs:
+    ci:
+      type: snowflake
+      account: 'not needed'
+      user: 'not needed'
+      role: SA_DEMO_CI_ROLE
+      database: "{{ env_var('DBT_DATABASE', 'SB_SNOWFLAKE_DBT_TESTING') }}"
+      schema: sa_demo_prod
+      warehouse: TRANSFORMING
+      threads: 4
+    prod:
+      type: snowflake
+      account: 'not needed'
+      user: 'not needed'
+      role: SA_DEMO_CI_ROLE
+      database: "{{ env_var('DBT_DATABASE', 'SB_SNOWFLAKE_DBT_TESTING') }}"
+      schema: sa_demo_prod
+      warehouse: TRANSFORMING
+      threads: 4
