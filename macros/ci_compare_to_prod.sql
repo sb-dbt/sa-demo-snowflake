@@ -4,7 +4,7 @@
     Uses audit_helper.compare_all_columns when the model has a `unique` test
     (used as the primary key), otherwise a row-level compare_relations summary.
 #}
-{% macro ci_compare_to_prod(prod_schema='prod') %}
+{% macro ci_compare_to_prod(prod_database='SB_SNOWFLAKE_DBT_TESTING', prod_schema='sa_demo_prod') %}
     {% if not execute or target.name != 'ci' %}
         {{ return('') }}
     {% endif %}
@@ -14,10 +14,10 @@
         {% if node.config.materialized == 'ephemeral' %}{% continue %}{% endif %}
 
         {% set ci_rel = adapter.get_relation(node.database, node.schema, node.alias) %}
-        {% set prod_rel = adapter.get_relation(node.database, prod_schema, node.alias) %}
+        {% set prod_rel = adapter.get_relation(prod_database, prod_schema, node.alias) %}
 
         {{ log('', info=true) }}
-        {{ log('===== Compare ' ~ node.name ~ ': ' ~ node.schema ~ ' vs ' ~ prod_schema ~ ' =====', info=true) }}
+        {{ log('===== Compare ' ~ node.name ~ ': ' ~ node.database ~ '.' ~ node.schema ~ ' vs ' ~ prod_database ~ '.' ~ prod_schema ~ ' =====', info=true) }}
 
         {% if ci_rel is none %}
             {{ log('  skipped: not built in CI', info=true) }}
