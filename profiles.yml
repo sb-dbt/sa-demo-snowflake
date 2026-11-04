@@ -1,0 +1,22 @@
+# Local dbt CLI profile. Safe to commit: no secrets.
+# Snowflake-hosted runs (Workspaces, CI, prod objects) ignore this file and
+# use dbt_projects_profiles.yml instead.
+#
+# Each developer sets one env var (e.g. in ~/.zshrc):
+#   export SNOWFLAKE_USER=jane_doe
+# Login is Okta SSO in the browser; builds land in schema dbt_<user>.
+analytics:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: ZNA84829
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      authenticator: externalbrowser
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'transformer') }}"
+      database: SB_SNOWFLAKE_DBT_TESTING
+      schema: "dbt_{{ env_var('SNOWFLAKE_USER') | lower }}"
+      warehouse: TRANSFORMING
+      threads: 4
+      client_session_keep_alive: false
+      reuse_connections: true
