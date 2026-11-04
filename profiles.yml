@@ -1,33 +1,22 @@
+# Local dbt CLI profile. Safe to commit: no secrets.
+# Snowflake-hosted runs ignore this file: Workspaces read
+# dbt_projects_profiles.yml, and CI/prod deploy with deploy/dbt_projects_profiles.yml.
+#
+# Each developer sets one env var (e.g. in ~/.zshrc):
+#   export SNOWFLAKE_USER=jane_doe
+# Login is Okta SSO in the browser; builds land in schema dbt_<user>.
 analytics:
   target: dev
   outputs:
-    # Personal development (TRANSFORMER). Can read prod, can't write it.
     dev:
       type: snowflake
-      account: 'not needed'
-      user: 'not needed'
-      role: transformer
+      account: ZNA84829
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      authenticator: externalbrowser
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'transformer') }}"
       database: SB_SNOWFLAKE_DBT_TESTING
-      schema: dev
+      schema: "dbt_{{ env_var('SNOWFLAKE_USER') | lower }}"
       warehouse: TRANSFORMING
       threads: 4
-    # Slim CI. DBT_DATABASE is overridden per pull request (see env.yml and the CI workflow)
-    ci:
-      type: snowflake
-      account: 'not needed'
-      user: 'not needed'
-      role: SA_DEMO_CI_ROLE
-      database: "{{ env_var('DBT_DATABASE', 'SB_SNOWFLAKE_DBT_TESTING') }}"
-      schema: sa_demo_prod
-      warehouse: TRANSFORMING
-      threads: 4
-    # Production. Only SA_DEMO_CI_ROLE (the CI/CD service user) can write here.
-    prod:
-      type: snowflake
-      account: 'not needed'
-      user: 'not needed'
-      role: SA_DEMO_CI_ROLE
-      database: "{{ env_var('DBT_DATABASE', 'SB_SNOWFLAKE_DBT_TESTING') }}"
-      schema: sa_demo_prod
-      warehouse: TRANSFORMING
-      threads: 4
+      client_session_keep_alive: false
+      reuse_connections: true
