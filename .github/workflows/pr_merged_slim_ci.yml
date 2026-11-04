@@ -53,6 +53,24 @@ jobs:
       - name: List all of the snowflake dbt project objects in your account
         run: snow dbt list --format JSON -x
 
+      # Slim: rebuild only what changed since prod's last successful run.
+      # Falls back to a full build when no state exists (none in the last 14 days).
+      - name: Build changed models in prod (becomes the next Slim CI state)
+        run: |
+          PROD_OBJECT="$SNOWFLAKE_DATABASE.$SNOWFLAKE_SCHEMA.SA_DEMO_SNOWFLAKE"
+          HAS_STATE=$(snow sql -x --format CSV -q \
+            "select SYSTEM\$DBT_GET_LAST_SUCCESSFUL_RUN_TARGET('$PROD_OBJECT') is not null as has_state" \
+            | tail -n 1)
+          if [ "$HAS_STATE" = "True" ]; then
+            snow dbt execute -x \
+              --import "SYSTEM\$DBT_GET_LAST_SUCCESSFUL_RUN_TARGET('$PROD_OBJECT') as state" \
+              SA_DEMO_SNOWFLAKE \
+              build --target prod --state ./imports/state --select state:modified+
+          else
+            echo "No prod state in the last 14 days: running full build"
+            snow dbt execute -x SA_DEMO_SNOWFLAKE build --target prod
+          fi
+
       # Creates or updates the 12-hour prod build task (keeps prod fresh and Slim CI state < 14 days old)
       - name: Run schedules.sql to create or alter tasks for SA_DEMO_SNOWFLAKE
         run: snow sql -f ${{ github.workspace }}/schedules.sql -x
