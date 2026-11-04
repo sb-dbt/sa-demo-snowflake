@@ -107,8 +107,6 @@ models:
           - not_null
       - name: order_key
         description: Foreign key to the parent order.
-      - name: row_hash
-        description: Hash of all non-key columns. The incremental merge uses it to rewrite only rows whose content changed.
       - name: order_date
         description: Date the parent order was placed.
       - name: customer_key
